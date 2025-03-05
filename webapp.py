@@ -5,17 +5,17 @@ import os
 from dotenv import load_dotenv
 
 # Page configuration
-st.set_page_config(page_title="Sales Query Assistant", page_icon="💡", layout="wide")
+st.set_page_config(page_title="C-Kore Sales Data Analyzer", page_icon="💡", layout="wide")
 
-class SalesQueryApp:
+class SalesDataQueryApp:
     def __init__(self):
         # Load environment variables
         load_dotenv()
         
         # OpenAI API setup
-        self.openai_api_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         if not self.openai_api_key:
-            st.error("Please set your OpenAI API key in secrets or .env file")
+            st.error("Please set your OpenAI API key in .env file")
             st.stop()
         
         # Initialize OpenAI client
@@ -24,71 +24,62 @@ class SalesQueryApp:
         # Data loading
         self.load_data()
 
-    def load_data(self):
+    def load_data(self, file_path="allops.csv"):
         try:
-            # Use st.cache_data to optimize loading
-            @st.cache_data
-            def load_csv():
-                return pd.read_csv("allops.csv")
-            
-            self.df = load_csv()
-            
-            # Try parsing date column
-            try:
-                self.df['Date'] = pd.to_datetime(self.df['Created On'], dayfirst=True)
-            except:
-                st.warning("Could not parse date column")
-        
+            self.df = pd.read_csv(file_path)
         except Exception as e:
-            st.error(f"Error loading data: {e}")
+            st.error(f"Could not load data: {e}")
             self.df = None
 
     def generate_pandas_query(self, question):
-        # Prepare column information
         column_info = ", ".join(f"{col} ({dtype})" for col, dtype in self.df.dtypes.items())
 
         prompt = f"""
         You are a data analysis assistant for a sales team. The DataFrame contains these columns and their data types: {column_info}.
         
-        Your task: Generate **ONLY** a valid Pandas query to answer this question precisely:
+        Your task: Generate **ONLY** a valid Pandas query to answer this question:
 
         "{question}"
 
         **Rules:**
-        - Assume 'df' is the DataFrame
-        - Output **ONLY** the Pandas command
-        - Focus on sales-relevant analyses
-        - Be concise and direct
+        - Assume 'df' is the DataFrame.
+        - Output **ONLY** the Pandas command (no explanations, no markdown).
+        - If the question is ambiguous, return a query that provides meaningful insight.
+        - Focus on sales-relevant analyses.
+        - Time data is in this format 24/11/2023  13:10:00 and is on the column 'Created On'
         """
 
         try:
-            response = openai.ChatCompletion.create(
+            client = openai.OpenAI(api_key=self.openai_api_key)
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[{"role": "user", "content": prompt}]
             )
             pandas_code = response.choices[0].message.content.strip()
 
-            return pandas_code if pandas_code else "df.head()"
-        
+            if not pandas_code or "Error" in pandas_code:
+                return "df.head()"
+            return pandas_code
         except Exception as e:
-            st.error(f"Query generation error: {e}")
+            st.error(f"Query Generation Error: {e}")
             return "df.head()"
 
     def execute_pandas_query(self, generated_code):
         local_vars = {"df": self.df}
+        global_vars = {"pd": pd}
         try:
-            exec(f"result = {generated_code}", {}, local_vars)
+            exec(f"result = {generated_code}", global_vars, local_vars)
             return local_vars["result"]
         except Exception as e:
             return f"Error executing query: {e}"
 
-    def quick_insights(self):
+    def show_quick_insights(self):
         insights = [
-            ("Total Extended Amount", "df['Extended Amount'].sum()"),
-            ("Average Product Quantity", "df['Quantity'].mean()"),
+            ("Total Sales", "df['Amount'].sum()"),
+            ("Average Order Value", "df['Amount'].mean()"),
             ("Number of Transactions", "len(df)"),
-            ("Top Product by Sales", "df.groupby('Product name')['Extended Amount'].sum().idxmax()"),
-            ("Average Order Value", "df['Extended Amount'].mean()"),
+            ("Top Product", "df.groupby('Product name')['Amount'].sum().idxmax()"),
+            ("Top Customer", "df.groupby('Account (Opportunity) (Opportunity)')['Amount'].sum().idxmax()")
         ]
 
         insight_results = {}
@@ -103,25 +94,27 @@ class SalesQueryApp:
 
 def main():
     # App title and description
-    st.title("🚀 Sales Data Query Assistant")
-    st.markdown("""
-    ### Your AI-Powered Sales Analytics Companion
-    - Ask natural language questions about your sales data
-    - Get instant insights and precise query results
+    st.title("🚀 C-Kore Sales Data Analyzer")
+    st.markdown("**EACH QUERY COSTS 0.007 POUNDS**")
+
+    # Query hints
+    st.sidebar.header("💡 Query Tips")
+    st.sidebar.markdown("""
+    Try these queries:
+    - 'Top 5 salesmen, created by'
+    - 'Average order value'
+    - 'top Sales by field'
+    - 'How many times have we worked with Technip UK Limited?"
     """)
 
     # Initialize the app
-    app = SalesQueryApp()
+    app = SalesDataQueryApp()
 
-    # Sidebar for user interactions
-    st.sidebar.header("Data Query Options")
-    
     # Query input
-    query = st.sidebar.text_input("Enter your sales query:", 
-        placeholder="e.g., Total sales for top 3 products")
+    query = st.text_input("Enter your query:")
     
     # Buttons
-    col1, col2 = st.sidebar.columns(2)
+    col1, col2 = st.columns(2)
     
     with col1:
         run_query = st.button("Run Query")
@@ -129,7 +122,7 @@ def main():
     with col2:
         show_insights = st.button("Quick Insights")
 
-    # Main content area
+    # Result container
     result_container = st.container()
 
     # Query execution
@@ -144,22 +137,11 @@ def main():
     # Quick insights
     if show_insights:
         with st.spinner('Calculating insights...'):
-            insights = app.quick_insights()
+            insights = app.show_quick_insights()
         
         result_container.subheader("Quick Sales Insights")
         for insight, value in insights.items():
             result_container.metric(insight, value)
-
-    # Additional context and help
-    st.sidebar.markdown("""
-    ### 💡 Query Tips
-    - Ask about sales, quantities, products
-    - Use natural language
-    - Examples:
-        - "Total sales this month"
-        - "Top 5 selling products"
-        - "Average order value"
-    """)
 
 if __name__ == "__main__":
     main()
