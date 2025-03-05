@@ -96,7 +96,7 @@ def main():
     # App title and description
     st.title("🚀 C-Kore Sales Data Analyzer")
     st.markdown("**EACH QUERY COSTS 0.007 POUNDS**")
-    st.markdown("Queries are case-sensitive, for better results try to avoid typos. If you get an error, try to be more specific about your query or refer to data stucture")
+    st.markdown("Queries are case-sensitive, for better results try to avoid typos. If you get an error, try to be more specific in your query.")
 
     # Query hints
     st.sidebar.header("💡 Query Tips")
