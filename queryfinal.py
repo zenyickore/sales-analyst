@@ -54,7 +54,7 @@ class SalesDataQueryApp:
         
         ttk.Button(button_frame, text="Run Query", command=self.run_query).pack(side='left', padx=(0, 10))
         ttk.Button(button_frame, text="Quick Insights", command=self.show_quick_insights).pack(side='left', padx=(0, 10))
-        ttk.Button(button_frame, text="Visualize Data", command=self.open_visualization_window).pack(side='left')
+
 
         # Results section
         results_frame = ttk.LabelFrame(main_frame, text="Results", padding="10 10 10 10")
@@ -71,6 +71,7 @@ class SalesDataQueryApp:
             "- 'Sales by field'"
         )
         ttk.Label(main_frame, text=hint_text, font=("Helvetica", 10), justify='left').pack(anchor='w', pady=(10, 0))
+        ttk.Label(main_frame, text="EACH QUERY COSTS 0.007 POUNDS", justify='right').pack(anchor='e', pady=(10, 0))
 
     def generate_pandas_query(self, question):
         column_info = ", ".join(f"{col} ({dtype})" for col, dtype in self.df.dtypes.items())
